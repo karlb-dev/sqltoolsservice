@@ -385,8 +385,7 @@ internal partial class VSCodeClientCore
             catch (Exception e)
 #pragma warning restore CA1031 // Do not catch general exception types
             {
-                //AddResponseMessage(chat, result: null, $"Error: Exception while invoking function. {e.Message}", toolCall, this.Logger);
-                continue;
+                throw new ToolCallException(function.Name, e);
             }
             finally
             {

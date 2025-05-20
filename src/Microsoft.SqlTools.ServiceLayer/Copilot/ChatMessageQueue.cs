@@ -19,7 +19,8 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot
     {
         ToolCallRequest,
         DirectRequest,
-        Response
+        Response,
+        Error
     }
 
     public record ChatMessage(
@@ -27,7 +28,8 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot
         string ConversationUri,
         IList<LanguageModelRequestMessage> Messages,
         IList<LanguageModelChatTool> Tools,
-        CopilotConversation Conversation
+        CopilotConversation Conversation,
+        ErrorMessage Error
     );
 
     public class ChatMessageQueue
@@ -98,6 +100,22 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot
                 };
             }
 
+            if (message.Type == RequestMessageType.Error)
+            {
+                conversation.State = new ConversationState
+                {
+                    Error = message.Error
+                };
+                NotifyError(message.Error, conversation);
+                return new GetNextMessageResponse
+                {
+                    ConversationUri = message.ConversationUri,
+                    MessageType = MessageType.Error,
+                    ResponseText = message.Error?.Message,
+                    Error = message.Error
+                };
+            }
+
             return new GetNextMessageResponse
             {
                 ConversationUri = message.ConversationUri,
@@ -139,6 +157,7 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot
 
             conversation.State.ResponseTool = tool;
             conversation.State.ResponseToolParameters = toolParameters;
+            conversation.State.Error = null;
             conversation.CompletionSource.TrySetResult(conversation.State);
         }
 
@@ -147,6 +166,15 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot
             Logger.Verbose($"NotifyToolCallRequest: Conversation '{conversation.ConversationUri}' for text '{userText}'");
 
             conversation.State.Response = userText;
+            conversation.State.Error = null;
+            conversation.CompletionSource.TrySetResult(conversation.State);
+        }
+
+        private void NotifyError(ErrorMessage error, CopilotConversation conversation)
+        {
+            Logger.Verbose($"NotifyError: Conversation '{conversation.ConversationUri}' error '{error?.Message}'");
+
+            conversation.State.Error = error;
             conversation.CompletionSource.TrySetResult(conversation.State);
         }
     }
