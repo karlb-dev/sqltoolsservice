@@ -18,6 +18,8 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot.Contracts
         RequestLLM = 2,
 
         RequestDirectLLM = 3,
+
+        Error = 4,
     }
 
     public enum MessageRole
@@ -71,6 +73,8 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot.Contracts
         public LanguageModelChatTool[] Tools { get; set; }
 
         public LanguageModelRequestMessage[] RequestMessages { get; set; }
+
+        public ErrorMessage Error { get; set; }
     }
    
     public class GetNextMessageRequest
