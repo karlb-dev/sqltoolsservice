@@ -38,6 +38,7 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot
         public string Response { get; set; }
         public LanguageModelChatTool ResponseTool { get; set; }
         public string ResponseToolParameters { get; set; }
+        public ErrorMessage Error { get; set; }
     }
 
     public class CopilotConversation
@@ -127,7 +128,7 @@ namespace Microsoft.SqlTools.ServiceLayer.Copilot
             IList<LanguageModelChatTool> tools)
         {
             conversations.TryGetValue(conversationUri, out var conversation);
-            var chatRequest = new ChatMessage(type, conversationUri, messages, tools, conversation);
+            var chatRequest = new ChatMessage(type, conversationUri, messages, tools, conversation, null);
             await messageQueue.EnqueueMessageAsync(chatRequest);
             return chatRequest;
         }
@@ -376,7 +377,7 @@ VERSION AWARENESS:
                             break;
                         case ResponseUpdateType.Completed:
                             await messageQueue.EnqueueMessageAsync(new ChatMessage(
-                                RequestMessageType.Response, conversation.ConversationUri, null, null, conversation));
+                                RequestMessageType.Response, conversation.ConversationUri, null, null, conversation, null));
                             break;
                     }
                 };
@@ -406,7 +407,7 @@ VERSION AWARENESS:
 
                 case ResponseUpdateType.Completed:
                     await messageQueue.EnqueueMessageAsync(new ChatMessage(
-                                RequestMessageType.Response, e.Conversation.ConversationUri, null, null, e.Conversation));
+                                RequestMessageType.Response, e.Conversation.ConversationUri, null, null, e.Conversation, null));
                     break;
 
                 case ResponseUpdateType.Started:
@@ -506,6 +507,18 @@ VERSION AWARENESS:
                     chatHistory.AddAssistantMessage(completeResponse.ToString());
                     responseHistory.Append(completeResponse);
                 }
+            }
+            catch (ToolCallException e)
+            {
+                Logger.Error($"Tool Execution Exception: {e.Message}");
+                await messageQueue.EnqueueMessageAsync(new ChatMessage(
+                    RequestMessageType.Error,
+                    chatExchangeId,
+                    null,
+                    null,
+                    conversations[chatExchangeId],
+                    new ErrorMessage { Type = "ToolExecutionError", Message = e.Message, ToolName = e.ToolName, StackTrace = e.StackTrace }));
+                return new RpcResponse<string>(SqlCopilotRpcReturnCodes.GeneralError, e.Message);
             }
             catch (HttpOperationException e)
             {
